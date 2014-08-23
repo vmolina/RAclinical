@@ -9,10 +9,11 @@ import csv
 import pickle
 
 CLINICAL_FILE = path.join(path.dirname(__file__), "../../data/TrainingData_PhenoCov_Release.txt" )
+CORONA_FILE = path.join(path.dirname(__file__), "../../data/TestData_Cov_Release.txt")
 TRAIN_FILE = path.join(path.dirname(__file__), "train.txt")
 TEST_FILE = path.join(path.dirname(__file__), "test.txt")
 
-def load_data():
+def load_data(corona=False):
     clinical_data = pd.read_csv(CLINICAL_FILE, delim_whitespace=True)
 
     lost_gender = np.isnan(clinical_data["Gender"])
@@ -23,9 +24,18 @@ def load_data():
 
 
     train = clinical_data[pd.isnull(clinical_data['Response.deltaDAS']) == False]
-    test = clinical_data[pd.isnull(clinical_data['Response.deltaDAS'])]
+    train['Mtx'][np.isnan(train['Mtx'])] = -1
+
+    if not corona:
+        test = clinical_data[pd.isnull(clinical_data['Response.deltaDAS'])]
+        test['Mtx'][np.isnan(test['Mtx'])] = -1
+    else:
+        test = pd.read_csv(CORONA_FILE, delim_whitespace=True)
+        test['Mtx'][np.isnan(test['Mtx'])] = -1
+
 
     return train, test
+
 
 
 def load_folds(fold_path,train_fold_path):
@@ -54,6 +64,27 @@ def create_folds_and_save(n_folds,n_train_folds, output_dir=None):
 
     with open(path.join(output_dir, "train_folds.pickle"),"w") as train_folds_out:
         pickle.dump(train_folds, train_folds_out)
+
+
+def update_results(ids, pred, results):
+    for method in pred:
+        if method not in results:
+            results[method] = {}
+        for i, id_ in enumerate(ids):
+            print i
+            print id_
+            if id_ in results:
+                results[id_].append(pred[method][i])
+            else:
+                results[id_] = [pred[method][i]]
+    return results
+
+def write_results(filename, results,ids):
+    with open(filename,"w") as out:
+        writer = csv.writer(out)
+        for id in ids:
+            writer.writerow([id, np.mean(results[id])])
+
 
 if __name__ == "__main__":
     create_folds_and_save(10, 10, path.join(path.dirname(__file__),"../../data/"))
